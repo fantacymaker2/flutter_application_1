@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'pages/login_page.dart';
-import 'pages/signup_page.dart';
-import 'pages/verify_email_page.dart';
+
 import 'pages/menu_page.dart';
 import 'pages/admin_home_page.dart';
 void main() async {
@@ -39,7 +38,6 @@ class MyApp extends StatelessWidget {
       home: const LoginPage(),
       routes: {
         '/login': (context) => const LoginPage(),
-        '/signup': (context) => const SignUpPage(),
         '/menu': (context) => const MenuPage(),
         '/adminhome': (context) => const AdminHomePage(),
       },

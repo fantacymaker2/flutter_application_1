@@ -57,6 +57,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
       // ✅ Build order data (just like React version)
       final orderData = {
+        'createdAt': FieldValue.serverTimestamp(),
         'userId': user.uid,
         'userEmail': user.email,
         'userName': user.displayName ?? user.email,
@@ -91,41 +92,16 @@ class _CheckoutPageState extends State<CheckoutPage> {
       };
 
       // ✅ Save to Firestore
-      await FirebaseFirestore.instance.collection('orders').add(orderData);
+      final docRef = await FirebaseFirestore.instance.collection('orders').add(orderData);
+final savedOrder = await docRef.get();
 
-      // ✅ Go to Receipt Page
-      if (mounted) {
-        widget.cart.clear();
-        Navigator.pushReplacement(
+if (mounted) {
+  Navigator.pushReplacement(
   context,
   MaterialPageRoute(
-    builder: (_) => ReceiptPage(
-      orderData: {
-        'orderNumber': '#GB-${DateTime.now().millisecondsSinceEpoch}',
-        'date': DateTime.now().toLocal().toString().split(' ')[0],
-        'time': TimeOfDay.now().format(context),
-        'paymentMethod': paymentMethod,
-        'reference': reference,
-        'contactNumber': '+63 912 345 6789',
-        'items': widget.cart.map((item) => {
-          'name': item['name'],
-          'quantity': item['quantity'],
-          'price': item['price'],
-          'total': item['price'] * item['quantity'],
-        }).toList(),
-        'subtotal': widget.totalPrice,
-        'total': widget.totalPrice,
-        'pickupLocation': {
-          'name': 'Grace Burger CDO',
-          'street': '123 Main Street',
-          'barangay': 'Barangay Carmen',
-          'city': 'Cagayan de Oro City',
-        },
-        'estimatedTime': '20-30 mins',
-       },
-      ),
-    ),
-  ).then((_) {
+    builder: (_) => ReceiptPage(orderId: docRef.id),
+  ),
+).then((_) {
     widget.cart.clear();
     Navigator.pop(context, true);
   });

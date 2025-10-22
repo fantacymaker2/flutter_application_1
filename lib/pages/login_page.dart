@@ -3,7 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
-import 'menu_page.dart'; // Create this page for post-login navigation
+import 'menu_page.dart';
+import 'admin_dashboard.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -15,141 +16,92 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
   bool _loading = false;
+  
+  bool _agreeTerms = false;
+  String? _errorMessage;
 
-  // 🔹 Sign in with Google
+  // ───────────────────────────────
+  // SIGN IN WITH GOOGLE
+  // ───────────────────────────────
   Future<void> _signInWithGoogle() async {
     setState(() => _loading = true);
     try {
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) {
-        setState(() => _loading = false);
-        return;
-      }
+      if (googleUser == null) return;
 
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
 
       final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
+        accessToken: googleAuth.accessToken,
       );
 
-      final userCredential = await _auth.signInWithCredential(credential);
-      final user = userCredential.user!;
+      final userCred = await _auth.signInWithCredential(credential);
+      final user = userCred.user!;
 
-      final userRef = _db.collection('users').doc(user.uid);
-      final docSnapshot = await userRef.get();
+      final userDoc = _db.collection('users').doc(user.uid);
+      final docSnapshot = await userDoc.get();
 
       if (!docSnapshot.exists) {
-        await userRef.set({
+        await userDoc.set({
           'uid': user.uid,
           'email': user.email,
-          'displayName': user.displayName,
+          'displayName': user.displayName ?? 'No Name',
           'photoURL': user.photoURL,
           'createdAt': DateTime.now().toIso8601String(),
           'orderHistory': [],
         });
       }
 
-      if (context.mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MenuPage()),
-        );
-      }
+      _navigateUser(user);
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Error: $e")));
+      _showSnack('Google sign-in failed: $e', isError: true);
     } finally {
       setState(() => _loading = false);
     }
   }
 
-  // 🔹 Sign in with Email
+  // ───────────────────────────────
+  // SIGN IN WITH EMAIL
+  // ───────────────────────────────
   Future<void> _signInWithEmail() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
+
     try {
-      await _auth.signInWithEmailAndPassword(
+      final result = await _auth.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-
-      if (context.mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MenuPage()),
-        );
-      }
+      final user = result.user!;
+      _navigateUser(user);
     } on FirebaseAuthException catch (e) {
-      String message = "Login failed";
-      if (e.code == 'user-not-found') message = "No user found for that email.";
-      if (e.code == 'wrong-password') message = "Incorrect password.";
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+      setState(() {
+        _errorMessage = e.code == 'user-not-found'
+            ? 'No user found for that email.'
+            : e.code == 'wrong-password'
+                ? 'Incorrect password.'
+                : e.message ?? 'Login failed.';
+      });
+      _showSnack(_errorMessage!, isError: true);
     } finally {
       setState(() => _loading = false);
     }
   }
 
-  // 🔹 Show Sign-Up Popup
-  void _showSignUpDialog() {
-    final TextEditingController nameCtrl = TextEditingController();
-    final TextEditingController emailCtrl = TextEditingController();
-    final TextEditingController passCtrl = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text("Create Account"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: "Full Name"),
-              ),
-              TextField(
-                controller: emailCtrl,
-                decoration: const InputDecoration(labelText: "Email"),
-              ),
-              TextField(
-                controller: passCtrl,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: "Password"),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.pop(context);
-                await _signUpWithEmail(
-                  nameCtrl.text.trim(),
-                  emailCtrl.text.trim(),
-                  passCtrl.text.trim(),
-                );
-              },
-              child: const Text("Sign Up"),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // 🔹 Create Account
+  // ───────────────────────────────
+  // SIGN UP FUNCTION
+  // ───────────────────────────────
   Future<void> _signUpWithEmail(
-      String fullName, String email, String password) async {
+      String name, String email, String password) async {
     setState(() => _loading = true);
     try {
       final result = await _auth.createUserWithEmailAndPassword(
@@ -160,93 +112,133 @@ class _LoginPageState extends State<LoginPage> {
       await _db.collection('users').doc(user.uid).set({
         'uid': user.uid,
         'email': user.email,
-        'displayName': fullName,
-        'photoURL': null,
+        'displayName': name,
         'createdAt': DateTime.now().toIso8601String(),
         'orderHistory': [],
       });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Account created successfully!")),
-      );
-    } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Error: ${e.message}")));
+      _showSnack('Account created successfully!');
+    } catch (e) {
+      _showSnack('Signup failed: $e', isError: true);
     } finally {
       setState(() => _loading = false);
     }
   }
 
+  // ───────────────────────────────
+  // NAVIGATE BASED ON ROLE
+  // ───────────────────────────────
+  void _navigateUser(User user) {
+    final isAdmin = user.email == 'admin@graceburger.com';
+    Widget nextPage =
+        isAdmin ? const AdminDashboard() : const MenuPage();
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => nextPage),
+    );
+  }
+
+  // ───────────────────────────────
+  // SHOW TOAST / SNACKBAR
+  // ───────────────────────────────
+  void _showSnack(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      backgroundColor: isError ? Colors.red : Colors.green,
+      content: Text(message),
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  // ───────────────────────────────
+  // BUILD UI
+  // ───────────────────────────────
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        // Background Image
-        Container(
-          decoration: const BoxDecoration(
-            image: DecorationImage(
-              image: AssetImage('assets/burger_bg.jpg'), // put your image here
-              fit: BoxFit.cover,
+    return Scaffold(
+      body: Stack(
+        children: [
+          // Background image
+          Container(
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/burger_bg.jpg'),
+                fit: BoxFit.cover,
+              ),
             ),
           ),
-        ),
-        // Overlay
-        Container(
-          color: Colors.black.withOpacity(0.6),
-        ),
-        Scaffold(
-          backgroundColor: Colors.transparent,
-          body: Center(
+          Container(color: Colors.black.withOpacity(0.6)),
+
+          Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 30),
               child: Card(
-                color: Colors.white.withOpacity(0.9),
+                margin: const EdgeInsets.symmetric(horizontal: 30),
+                color: Colors.white.withOpacity(0.95),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20)),
-                elevation: 8,
+                elevation: 10,
                 child: Padding(
-                  padding: const EdgeInsets.all(25),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Text(
                         "Grace Burger Login",
                         style: TextStyle(
-                          fontSize: 26,
+                          fontSize: 28,
                           fontWeight: FontWeight.bold,
                           color: Colors.brown,
                         ),
                       ),
                       const SizedBox(height: 20),
+
+                      if (_errorMessage != null)
+                        Text(
+                          _errorMessage!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+
                       TextField(
                         controller: _emailController,
-                        decoration: const InputDecoration(labelText: "Email"),
+                        decoration: const InputDecoration(
+                          labelText: "Email",
+                        ),
                       ),
                       const SizedBox(height: 10),
                       TextField(
                         controller: _passwordController,
                         obscureText: true,
-                        decoration: const InputDecoration(labelText: "Password"),
+                        decoration: const InputDecoration(
+                          labelText: "Password",
+                        ),
                       ),
                       const SizedBox(height: 20),
+
                       ElevatedButton(
                         onPressed: _loading ? null : _signInWithEmail,
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.brown),
                         child: _loading
-                            ? const CircularProgressIndicator()
-                            : const Text("Login"),
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
+                            : const Text("Sign In"),
                       ),
+
                       const SizedBox(height: 10),
+
                       OutlinedButton.icon(
                         onPressed: _loading ? null : _signInWithGoogle,
-                        icon: Image.asset(
-                          'assets/google.png',
-                          height: 20,
-                        ),
+                        icon: Image.asset('assets/google.png', height: 18),
                         label: const Text("Sign in with Google"),
                       ),
+
                       const SizedBox(height: 10),
+
                       TextButton(
-                        onPressed: _showSignUpDialog,
+                        onPressed: () {
+                          _showSignUpDialogFunc();
+                        },
                         child: const Text("Create an Account"),
                       ),
                     ],
@@ -255,8 +247,94 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
+    );
+  }
+
+  // ───────────────────────────────
+  // SIGNUP DIALOG (LIKE REACT MODAL)
+  // ───────────────────────────────
+  void _showSignUpDialogFunc() {
+    final nameCtrl = TextEditingController();
+    final emailCtrl = TextEditingController();
+    final passCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(builder: (context, setStateDialog) {
+        return AlertDialog(
+          title: const Text("Create Account"),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          content: SingleChildScrollView(
+            child: Column(
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: "Full Name"),
+                ),
+                TextField(
+                  controller: emailCtrl,
+                  decoration: const InputDecoration(labelText: "Email"),
+                ),
+                TextField(
+                  controller: passCtrl,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: "Password"),
+                ),
+                TextField(
+                  controller: confirmCtrl,
+                  obscureText: true,
+                  decoration:
+                      const InputDecoration(labelText: "Confirm Password"),
+                ),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _agreeTerms,
+                      onChanged: (val) {
+                        setStateDialog(() => _agreeTerms = val ?? false);
+                      },
+                    ),
+                    const Expanded(
+                      child: Text(
+                          "I agree to the Terms of Service and Privacy Policy"),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (!_agreeTerms) {
+                  _showSnack("Please agree to the terms.", isError: true);
+                  return;
+                }
+                if (passCtrl.text != confirmCtrl.text) {
+                  _showSnack("Passwords do not match.", isError: true);
+                  return;
+                }
+                Navigator.pop(context);
+                _signUpWithEmail(
+                  nameCtrl.text.trim(),
+                  emailCtrl.text.trim(),
+                  passCtrl.text.trim(),
+                );
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.brown),
+              child: const Text("Create Account"),
+            ),
+          ],
+        );
+      }),
     );
   }
 }

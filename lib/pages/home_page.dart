@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'login_page.dart';
-import 'about_us_page.dart';
+
 import 'cart_manager.dart';
 import 'cart_page.dart';
 
@@ -225,16 +225,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 child: Icon(Icons.person),
               ),
             ),
-            ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: const Text('About Us'),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const AboutUsPage()),
-                );
-              },
-            ),
+            
             const Divider(),
             ListTile(
               leading: const Icon(Icons.logout),
