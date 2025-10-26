@@ -186,85 +186,88 @@ if (mounted) {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey[850]!),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'YOUR ORDER',
-            style: TextStyle(
-              color: Colors.amber,
-              fontSize: 24,
-              letterSpacing: 2,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text('Review your items', style: TextStyle(color: Colors.grey)),
-          const Divider(color: Colors.grey),
-          ...widget.cart.map((item) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: Row(
-                  children: [
-                    Image.network(
-                      item['image'] ?? '',
+      child: SingleChildScrollView(
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        'YOUR ORDER',
+        style: TextStyle(
+          color: Colors.amber,
+          fontSize: 24,
+          letterSpacing: 2,
+        ),
+      ),
+      const SizedBox(height: 8),
+      const Text('Review your items', style: TextStyle(color: Colors.grey)),
+      const Divider(color: Colors.grey),
+      ...widget.cart.map((item) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Row(
+              children: [
+                Image.network(
+                  item['image'] ?? '',
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
                       width: 80,
                       height: 80,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          width: 80,
-                          height: 80,
-                          color: Colors.grey[900],
-                          child: const Icon(Icons.fastfood,
-                              color: Colors.amber, size: 40),
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(item['name'],
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 16)),
-                          const SizedBox(height: 4),
-                          Text('₱${item['price']} × ${item['quantity']}',
-                              style: const TextStyle(
-                                  color: Colors.grey, fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      '₱${item['price'] * item['quantity']}',
-                      style: const TextStyle(
-                          color: Colors.amber,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16),
-                    )
-                  ],
+                      color: Colors.grey[900],
+                      child: const Icon(Icons.fastfood,
+                          color: Colors.amber, size: 40),
+                    );
+                  },
                 ),
-              )),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1a1a1a),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Total', style: TextStyle(fontSize: 16)),
-                Text('₱${widget.totalPrice}',
-                    style: const TextStyle(
-                        color: Colors.amber,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item['name'],
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 16)),
+                      const SizedBox(height: 4),
+                      Text('₱${item['price']} × ${item['quantity']}',
+                          style: const TextStyle(
+                              color: Colors.grey, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Text(
+                  '₱${item['price'] * item['quantity']}',
+                  style: const TextStyle(
+                      color: Colors.amber,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16),
+                )
               ],
             ),
-          )
-        ],
+          )),
+      const SizedBox(height: 16),
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1a1a1a),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Total', style: TextStyle(fontSize: 16)),
+            Text('₱${widget.totalPrice}',
+                style: const TextStyle(
+                    color: Colors.amber,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold)),
+          ],
+        ),
       ),
+    ],
+  ),
+),
+
     );
   }
 

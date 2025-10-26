@@ -5,65 +5,151 @@ import 'package:intl/intl.dart';
 class OrdersPage extends StatelessWidget {
   const OrdersPage({super.key});
 
-  Stream<QuerySnapshot> getOrdersStream() {
+  // 🔹 Stream with client-side sorting (handles both string + Timestamp)
+  Stream<List<QueryDocumentSnapshot>> getOrdersStream() {
     return FirebaseFirestore.instance
         .collection('orders')
-        .orderBy('createdAt', descending: true)
-        .snapshots();
+        .snapshots()
+        .map((snapshot) {
+      final docs = snapshot.docs;
+
+      docs.sort((a, b) {
+        final aData = a.data() as Map<String, dynamic>;
+        final bData = b.data() as Map<String, dynamic>;
+        final aCreated = _parseCreatedAt(aData['createdAt']);
+        final bCreated = _parseCreatedAt(bData['createdAt']);
+        return bCreated.compareTo(aCreated); // newest first
+      });
+
+      return docs;
+    });
   }
 
-  Future<void> updateOrderStatus(String id, String status, {List<dynamic>? items}) async {
-  final firestore = FirebaseFirestore.instance;
-  final orderRef = firestore.collection('orders').doc(id);
-  final inventoryRef = firestore.collection('inventory');
+  static DateTime _parseCreatedAt(dynamic createdAt) {
+    if (createdAt == null) return DateTime(2000);
+    if (createdAt is Timestamp) return createdAt.toDate();
+    if (createdAt is String) {
+      try {
+        return DateTime.parse(createdAt);
+      } catch (_) {
+        return DateTime(2000);
+      }
+    }
+    return DateTime(2000);
+  }
 
-  await firestore.runTransaction((transaction) async {
-    // 🔹 Update order status
-    transaction.update(orderRef, {'status': status});
+  Future<void> updateOrderStatus(
+    BuildContext context,
+    String id,
+    String status, {
+    List<dynamic>? items,
+  }) async {
+    final firestore = FirebaseFirestore.instance;
+    final orderRef = firestore.collection('orders').doc(id);
+    final inventoryRef = firestore.collection('inventory');
 
-    // 🔹 When order starts preparing → update inventory
+    // ✅ Before preparing, check if all ingredients are in stock
     if (status == 'preparing' && items != null) {
-      // 🧩 1. Combine ingredient usage across all items
-      final Map<String, int> totalUsed = {};
+      final Map<String, int> totalNeeded = {};
 
+      // Combine total ingredients needed
       for (var item in items) {
         final ingredients = List<String>.from(item['ingredients'] ?? []);
-        final quantity = (item['quantity'] ?? 1).toInt();
+        final num rawQuantity = item['quantity'] ?? 1;
+        final int quantity = rawQuantity.toInt();
 
         for (var ingredient in ingredients) {
-  final int qty = (quantity is num) ? quantity.toInt() : 1;
-  totalUsed[ingredient] = (totalUsed[ingredient] ?? 0) + qty;
-}
+          totalNeeded[ingredient] = (totalNeeded[ingredient] ?? 0) + quantity;
+        }
       }
 
-      // 🧮 2. Deduct combined quantities from inventory
-      for (var entry in totalUsed.entries) {
+      // 🔍 Check inventory availability
+      for (var entry in totalNeeded.entries) {
         final ingredient = entry.key;
-        final totalQuantity = entry.value;
+        final int totalQuantity = entry.value;
 
-        // Find ingredient document in inventory
         final snapshot = await inventoryRef
             .where('name', isEqualTo: ingredient)
             .limit(1)
             .get();
 
-        if (snapshot.docs.isNotEmpty) {
-          final doc = snapshot.docs.first;
-          final docRef = doc.reference;
-          final currentStock = (doc['stock'] ?? 0).toInt();
-          final newStock = (currentStock - totalQuantity).clamp(0, 999999).toInt();
+        if (snapshot.docs.isEmpty) {
+          _showErrorDialog(
+              context, 'Ingredient "$ingredient" not found in inventory.');
+          return;
+        }
 
-          print('🧮 $ingredient stock updated: $currentStock → $newStock');
+        final num rawStock = snapshot.docs.first['stock'] ?? 0;
+        final int stock = rawStock.toInt();
 
-          transaction.update(docRef, {'stock': newStock});
-        } else {
-          print('⚠️ Ingredient "$ingredient" not found in inventory.');
+        if (stock < totalQuantity) {
+          _showErrorDialog(
+            context,
+            'Not enough stock for "$ingredient". (Have $stock, need $totalQuantity)',
+          );
+          return;
         }
       }
     }
-  });
-}
 
+    // ✅ All checks passed → proceed with status update and deduction
+    await firestore.runTransaction((transaction) async {
+      transaction.update(orderRef, {'status': status});
+
+      if (status == 'preparing' && items != null) {
+        final Map<String, int> totalUsed = {};
+
+        for (var item in items) {
+          final ingredients = List<String>.from(item['ingredients'] ?? []);
+          final num rawQuantity = item['quantity'] ?? 1;
+          final int quantity = rawQuantity.toInt();
+
+          for (var ingredient in ingredients) {
+            totalUsed[ingredient] = (totalUsed[ingredient] ?? 0) + quantity;
+          }
+        }
+
+        for (var entry in totalUsed.entries) {
+          final ingredient = entry.key;
+          final int totalQuantity = entry.value;
+
+          final snapshot = await inventoryRef
+              .where('name', isEqualTo: ingredient)
+              .limit(1)
+              .get();
+
+          if (snapshot.docs.isNotEmpty) {
+            final doc = snapshot.docs.first;
+            final docRef = doc.reference;
+            final num rawStock = doc['stock'] ?? 0;
+            final int currentStock = rawStock.toInt();
+            final int newStock =
+                (currentStock - totalQuantity).clamp(0, 999999).toInt();
+
+            transaction.update(docRef, {'stock': newStock});
+          }
+        }
+      }
+    });
+  }
+
+  void _showErrorDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title:
+            const Text('Order Error', style: TextStyle(color: Colors.redAccent)),
+        content: Text(message, style: const TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> cancelOrder(String id) async {
     await FirebaseFirestore.instance
@@ -98,14 +184,14 @@ class OrdersPage extends StatelessWidget {
         backgroundColor: Colors.brown.shade800,
         centerTitle: true,
       ),
-      body: StreamBuilder<QuerySnapshot>(
+      body: StreamBuilder<List<QueryDocumentSnapshot>>(
         stream: getOrdersStream(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return const Center(
               child: Text(
                 "No orders yet.",
@@ -114,10 +200,9 @@ class OrdersPage extends StatelessWidget {
             );
           }
 
-          final orders = snapshot.data!.docs;
-
-          // Calculate dashboard stats
+          final orders = snapshot.data!;
           final today = DateTime.now();
+
           int pendingCount = 0;
           int completedCount = 0;
           int totalToday = 0;
@@ -125,17 +210,9 @@ class OrdersPage extends StatelessWidget {
 
           for (var doc in orders) {
             final data = doc.data() as Map<String, dynamic>;
-            final status = data['status'] ?? '';
-            DateTime createdAt;
+            final status = (data['status'] ?? '').toString().toLowerCase();
+            final createdAt = _parseCreatedAt(data['createdAt']);
 
-final rawDate = data['createdAt'];
-if (rawDate is Timestamp) {
-  createdAt = rawDate.toDate();
-} else if (rawDate is String) {
-  createdAt = DateTime.tryParse(rawDate) ?? DateTime.now();
-} else {
-  createdAt = DateTime.now();
-}
             final isToday = createdAt.year == today.year &&
                 createdAt.month == today.month &&
                 createdAt.day == today.day;
@@ -145,8 +222,9 @@ if (rawDate is Timestamp) {
             if (isToday) {
               totalToday++;
               if (status == 'completed') {
-  revenueToday += (data['totalAmount'] ?? data['subtotal'] ?? 0).toDouble();
-}
+                revenueToday +=
+                    (data['totalAmount'] ?? data['subtotal'] ?? 0).toDouble();
+              }
             }
           }
 
@@ -162,7 +240,11 @@ if (rawDate is Timestamp) {
                       _buildStatCard("Pending", "$pendingCount", Colors.orange),
                       _buildStatCard("Completed", "$completedCount", Colors.green),
                       _buildStatCard("Orders Today", "$totalToday", Colors.blue),
-                      _buildStatCard("Revenue", "₱${revenueToday.toStringAsFixed(2)}", Colors.amber),
+                      _buildStatCard(
+                        "Revenue",
+                        "₱${revenueToday.toStringAsFixed(2)}",
+                        Colors.amber,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -176,28 +258,23 @@ if (rawDate is Timestamp) {
                       final order = orders[index];
                       final data = order.data() as Map<String, dynamic>;
                       final items = data['items'] as List<dynamic>? ?? [];
-                      final status = data['status'] ?? 'unknown';
-                      final customer = data['customerName'] ?? 'Guest';
+                      final status = (data['status'] ?? 'unknown').toString().toLowerCase();
+                      final customer = data['customerName'] ??
+                          data['userName'] ??
+                          'Guest';
                       final payment = data['paymentMethod'] ?? 'Cash';
-                      final total = (data['totalAmount'] ?? data['subtotal'] ?? 0).toDouble();
-                      DateTime createdAt;
-final rawDate = data['createdAt'];
-if (rawDate is Timestamp) {
-  createdAt = rawDate.toDate();
-} else if (rawDate is String) {
-  createdAt = DateTime.tryParse(rawDate) ?? DateTime.now();
-} else {
-  createdAt = DateTime.now();
-}
+                      final total =
+                          (data['totalAmount'] ?? data['subtotal'] ?? 0).toDouble();
+                      final createdAt = _parseCreatedAt(data['createdAt']);
 
-                      // Skip cancelled orders
                       if (status == 'cancelled') return const SizedBox();
 
                       return Card(
                         color: const Color(0xFF2A2A2A),
                         margin: const EdgeInsets.only(bottom: 12),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16)),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Column(
@@ -205,14 +282,16 @@ if (rawDate is Timestamp) {
                             children: [
                               // Header
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     customer,
                                     style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white),
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
@@ -224,8 +303,9 @@ if (rawDate is Timestamp) {
                                     child: Text(
                                       status.toUpperCase(),
                                       style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold),
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -271,15 +351,20 @@ if (rawDate is Timestamp) {
                                   if (status == 'received' ||
                                       status == 'processing')
                                     ElevatedButton(
-                                      onPressed: () => updateOrderStatus(order.id, 'preparing', items: items),
+                                      onPressed: () => updateOrderStatus(
+                                        context,
+                                        order.id,
+                                        'preparing',
+                                        items: items,
+                                      ),
                                       style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.orange),
                                       child: const Text("ACCEPT"),
                                     ),
                                   if (status == 'preparing')
                                     ElevatedButton(
-                                      onPressed: () =>
-                                          updateOrderStatus(order.id, 'ready'),
+                                      onPressed: () => updateOrderStatus(
+                                          context, order.id, 'ready'),
                                       style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.amber),
                                       child: const Text("MARK READY"),
@@ -287,7 +372,7 @@ if (rawDate is Timestamp) {
                                   if (status == 'ready')
                                     ElevatedButton(
                                       onPressed: () => updateOrderStatus(
-                                          order.id, 'completed'),
+                                          context, order.id, 'completed'),
                                       style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.green),
                                       child: const Text("COMPLETE"),
@@ -302,8 +387,10 @@ if (rawDate is Timestamp) {
                                       style: OutlinedButton.styleFrom(
                                         side: const BorderSide(color: Colors.red),
                                       ),
-                                      child: const Text("CANCEL",
-                                          style: TextStyle(color: Colors.red)),
+                                      child: const Text(
+                                        "CANCEL",
+                                        style: TextStyle(color: Colors.red),
+                                      ),
                                     ),
                                 ],
                               ),
