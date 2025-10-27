@@ -45,9 +45,7 @@ void initState() {
   _tabController = TabController(length: categories.length, vsync: this);
   _cartController = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
 
-  _fetchMenu();
-  _fetchInventory();
-  _fetchTopOrderedItems(); // ✅ Fetch Top 5 once
+   _initData();
 
   _searchController.addListener(() {
     setState(() {
@@ -56,6 +54,11 @@ void initState() {
   });
 }
 
+Future<void> _initData() async {
+  await _fetchMenu();       // make sure _menuItems is ready
+  await _fetchInventory();  // load inventory after
+  await _fetchTopOrderedItems(); // ✅ now images will map correctly
+}
 
   @override
   void dispose() {
@@ -104,7 +107,7 @@ void initState() {
             'name': data['name'] ?? '',
             'price': data['price'] ?? 0,
             'category': data['category'] ?? categoryDoc.id,
-            'image': data['image'] ?? 'https://via.placeholder.com/150',
+            'image': data['imageUrl'] ?? 'https://via.placeholder.com/150',
             'description': data['description'] ?? '',
             'ingredients': (data['ingredients'] != null &&
                     data['ingredients'] is List)
@@ -164,14 +167,17 @@ void initState() {
     final data = orderDoc.data();
     final items = List<Map<String, dynamic>>.from(data['items'] ?? []);
     for (var item in items) {
-      final name = item['name'];
+      final name = item['name']?.toString()?.trim() ?? '';
+      final price = item['price'] ?? 0;
+
+      if (name.isEmpty) continue;
+
       if (itemCounts.containsKey(name)) {
         itemCounts[name]!['count'] += (item['quantity'] ?? 1);
       } else {
         itemCounts[name] = {
           'name': name,
-          'image': item['image'],
-          'price': item['price'],
+          'price': price,
           'count': item['quantity'] ?? 1,
         };
       }
@@ -181,12 +187,31 @@ void initState() {
   List<Map<String, dynamic>> sortedItems = itemCounts.values.toList();
   sortedItems.sort((a, b) => b['count'].compareTo(a['count']));
 
+  // 🧠 Always replace image with one from the menu if available
+  for (var item in sortedItems) {
+    final match = _menuItems.firstWhere(
+      (m) =>
+          m['name'].toString().toLowerCase().trim() ==
+          item['name'].toString().toLowerCase().trim(),
+      orElse: () => {},
+    );
+
+    if (match.isNotEmpty) {
+      item['image'] = match['image'] ?? 'https://via.placeholder.com/150';
+    } else {
+      print("⚠️ No match in menu for: ${item['name']}");
+      item['image'] = 'https://via.placeholder.com/150';
+    }
+  }
+
   if (!mounted) return;
   setState(() {
     _topItems = sortedItems.take(5).toList();
     _isLoadingTopItems = false;
   });
 }
+
+
 
   void _addToCart(Map<String, dynamic> item) {
     setState(() {
@@ -285,100 +310,218 @@ Navigator.push(
 
       ),
       body: Stack(
-        children: [
-          Column(
-            children: [
-              // 🔥 Top 5 Section stays the same
-              _isLoadingTopItems
-  ? const Center(child: CircularProgressIndicator())
-  : _topItems.isEmpty
-      ? const Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Text("🔥 No top orders yet"),
-        )
-      : Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "🔥 Top 5 Most Ordered",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orangeAccent,
-                ),
+  children: [
+    Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 🧭 Search bar on top
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: "Search in this category",
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
               ),
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 200,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _topItems.length,
-                  itemBuilder: (context, index) {
-                    final item = _topItems[index];
-                    return Container(
-                      width: 160,
-                      margin: const EdgeInsets.only(right: 10),
-                      child: Card(
-                        color: Colors.black12,
+            ),
+          ),
+        ),
+
+        // 🔥 Top 5 section scrollable horizontally
+        if (_isLoadingTopItems)
+          const Center(child: CircularProgressIndicator())
+        else if (_topItems.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text("🔥 No top orders yet"),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "🔥 Top 5 Most Ordered",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orangeAccent,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 200,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _topItems.length,
+                    itemBuilder: (context, index) {
+                      final item = _topItems[index];
+                      return Container(
+                        width: 160,
+                        margin: const EdgeInsets.only(right: 10),
+                        child: Card(
+                          color: Colors.black12,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(15),
+                                  ),
+                                  child: Image.network(
+                                    item['image'] ?? '',
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const Icon(
+                                      Icons.fastfood,
+                                      size: 50,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(item['name'],
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white)),
+                                    Text('₱${item['price']}',
+                                        style: const TextStyle(
+                                            color: Colors.white70)),
+                                    Text('Ordered ${item['count']}x',
+                                        style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.orangeAccent)),
+                                    const SizedBox(height: 6),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        final matched = _menuItems.firstWhere(
+                                          (m) =>
+                                              m['name'].toString().toLowerCase() ==
+                                              item['name']
+                                                  .toString()
+                                                  .toLowerCase(),
+                                          orElse: () => {},
+                                        );
+                                        final fullItem = matched.isNotEmpty
+                                            ? matched
+                                            : {
+                                                'id': item['name'],
+                                                'name': item['name'],
+                                                'price': item['price'],
+                                                'image': item['image'],
+                                                'description': '',
+                                                'ingredients': const [],
+                                              };
+                                        _addToCart(fullItem);
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.orangeAccent,
+                                      ),
+                                      child: const Text('Add to Cart'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const Divider(thickness: 1),
+              ],
+            ),
+          ),
+
+        // 🧱 Expand the tabbed menu grid below
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: categories.map((category) {
+              final items = _getFilteredItems(category);
+              if (items.isEmpty) {
+                return const Center(child: Text('No items found.'));
+              }
+              return GridView.builder(
+                padding: const EdgeInsets.all(10),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: 0.75,
+                ),
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  final isSoldOut = _isItemSoldOut(item);
+                  return Stack(
+                    children: [
+                      Card(
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(15),
                         ),
+                        elevation: 4,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Expanded(
                               child: ClipRRect(
-                                borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
-                                child: Image.network(
-                                  item['image'] ?? '',
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      const Icon(Icons.fastfood, size: 50),
+                                borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(15)),
+                                child: ColorFiltered(
+                                  colorFilter: isSoldOut
+                                      ? const ColorFilter.mode(
+                                          Colors.black45, BlendMode.darken)
+                                      : const ColorFilter.mode(
+                                          Colors.transparent,
+                                          BlendMode.multiply),
+                                  child: Image.network(
+                                    item['image'],
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
                               ),
                             ),
                             Padding(
-                              padding: const EdgeInsets.all(8.0),
+                              padding: const EdgeInsets.all(8),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(item['name'],
                                       style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white)),
-                                  Text('₱${item['price']}',
-                                      style: const TextStyle(color: Colors.white70)),
-                                  Text('Ordered ${item['count']}x',
-                                      style: const TextStyle(
-                                          fontSize: 12, color: Colors.orangeAccent)),
-                                  const SizedBox(height: 6),
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold)),
+                                  Text('₱${item['price']}'),
+                                  const SizedBox(height: 4),
+                                  Text(item['description'],
+                                      style:
+                                          const TextStyle(fontSize: 12),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis),
+                                  const SizedBox(height: 8),
                                   ElevatedButton(
-                                    onPressed: () {
-                                      final matched = _menuItems.firstWhere(
-                                        (m) => m['name']
-                                            .toString()
-                                            .toLowerCase() ==
-                                        item['name'].toString().toLowerCase(),
-                                        orElse: () => {},
-                                      );
-                                      final fullItem = matched.isNotEmpty
-                                          ? matched
-                                          : {
-                                              'id': item['name'],
-                                              'name': item['name'],
-                                              'price': item['price'],
-                                              'image': item['image'],
-                                              'description': '',
-                                              'ingredients': const [],
-                                            };
-                                      _addToCart(fullItem);
-                                    },
+                                    onPressed: isSoldOut
+                                        ? null
+                                        : () => _addToCart(item),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.orangeAccent,
+                                      backgroundColor: isSoldOut
+                                          ? Colors.grey
+                                          : Colors.orangeAccent,
                                     ),
-                                    child: const Text('Add to Cart'),
+                                    child: Text(isSoldOut
+                                        ? 'Sold Out'
+                                        : 'Add to Cart'),
                                   ),
                                 ],
                               ),
@@ -386,127 +529,15 @@ Navigator.push(
                           ],
                         ),
                       ),
-                    );
-                  },
-                ),
-              ),
-              const Divider(thickness: 1),
-            ],
+                    ],
+                  );
+                },
+              );
+            }).toList(),
           ),
         ),
-
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: "Search in this category",
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: categories.map((category) {
-                    final items = _getFilteredItems(category);
-                    if (items.isEmpty) {
-                      return const Center(child: Text('No items found.'));
-                    }
-                    return GridView.builder(
-                      padding: const EdgeInsets.all(10),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 10,
-                        crossAxisSpacing: 10,
-                        childAspectRatio: 0.75,
-                      ),
-                      itemCount: items.length,
-                      itemBuilder: (context, index) {
-                        final item = items[index];
-                        final isSoldOut = _isItemSoldOut(item); // ✅ check here
-                        return Stack(
-                          children: [
-                            Card(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              elevation: 4,
-                              child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.stretch,
-                                children: [
-                                  Expanded(
-                                    child: ClipRRect(
-                                      borderRadius:
-                                          const BorderRadius.vertical(
-                                              top: Radius.circular(15)),
-                                      child: ColorFiltered(
-                                        colorFilter: isSoldOut
-                                            ? const ColorFilter.mode(
-                                                Colors.black45,
-                                                BlendMode.darken)
-                                            : const ColorFilter.mode(
-                                                Colors.transparent,
-                                                BlendMode.multiply),
-                                        child: Image.network(
-                                          item['image'],
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(8),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(item['name'],
-                                            style: const TextStyle(
-                                                fontSize: 16,
-                                                fontWeight:
-                                                    FontWeight.bold)),
-                                        Text('₱${item['price']}'),
-                                        const SizedBox(height: 4),
-                                        Text(item['description'],
-                                            style:
-                                                const TextStyle(fontSize: 12),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis),
-                                        const SizedBox(height: 8),
-                                        ElevatedButton(
-                                          onPressed: isSoldOut
-                                              ? null
-                                              : () => _addToCart(item),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: isSoldOut
-                                                ? Colors.grey
-                                                : Colors.orangeAccent,
-                                          ),
-                                          child: Text(isSoldOut
-                                              ? 'Sold Out'
-                                              : 'Add to Cart'),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    );
-                  }).toList(),
-                ),
-              ),
-            ],
-          ),
+      ],
+    ),
           // ✅ unchanged cart drawer below
           AnimatedBuilder(
             animation: _cartController,

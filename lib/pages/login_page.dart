@@ -29,10 +29,21 @@ class _LoginPageState extends State<LoginPage> {
   // SIGN IN WITH GOOGLE
   // ───────────────────────────────
   Future<void> _signInWithGoogle() async {
-    setState(() => _loading = true);
-    try {
+  setState(() => _loading = true);
+  try {
+    // For both Web & Mobile
+    UserCredential userCred;
+
+    if (Theme.of(context).platform == TargetPlatform.android ||
+        Theme.of(context).platform == TargetPlatform.iOS) {
+      // ───────────────────────────────
+      // MOBILE FLOW
+      // ───────────────────────────────
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) return;
+      if (googleUser == null) {
+        setState(() => _loading = false);
+        return; // User cancelled
+      }
 
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
@@ -42,30 +53,46 @@ class _LoginPageState extends State<LoginPage> {
         accessToken: googleAuth.accessToken,
       );
 
-      final userCred = await _auth.signInWithCredential(credential);
-      final user = userCred.user!;
-
-      final userDoc = _db.collection('users').doc(user.uid);
-      final docSnapshot = await userDoc.get();
-
-      if (!docSnapshot.exists) {
-        await userDoc.set({
-          'uid': user.uid,
-          'email': user.email,
-          'displayName': user.displayName ?? 'No Name',
-          'photoURL': user.photoURL,
-          'createdAt': DateTime.now().toIso8601String(),
-          'orderHistory': [],
-        });
-      }
-
-      _navigateUser(user);
-    } catch (e) {
-      _showSnack('Google sign-in failed: $e', isError: true);
-    } finally {
-      setState(() => _loading = false);
+      userCred = await _auth.signInWithCredential(credential);
+    } else {
+      // ───────────────────────────────
+      // WEB FLOW (like signInWithPopup)
+      // ───────────────────────────────
+      await _auth.signOut();
+      GoogleAuthProvider provider = GoogleAuthProvider();
+      provider.setCustomParameters({'prompt': 'select_account'});
+      userCred = await _auth.signInWithPopup(provider);
     }
+
+    final user = userCred.user!;
+    final userRef = _db.collection('users').doc(user.uid);
+    final userSnap = await userRef.get();
+
+    // ───────────────────────────────
+    // FIRESTORE USER CREATION (LIKE REACT)
+    // ───────────────────────────────
+    if (!userSnap.exists) {
+      await userRef.set({
+        'uid': user.uid,
+        'email': user.email,
+        'displayName': user.displayName ?? 'No Name',
+        'photoURL': user.photoURL,
+        'createdAt': DateTime.now().toIso8601String(),
+        'orderHistory': [],
+      });
+      debugPrint("✅ New user created in Firestore: ${user.email}");
+    } else {
+      debugPrint("ℹ️ Existing user logged in: ${user.email}");
+    }
+
+    _navigateUser(user);
+  } catch (e) {
+    _showSnack('Google sign-in failed: $e', isError: true);
+    debugPrint('Google sign-in error: $e');
+  } finally {
+    setState(() => _loading = false);
   }
+}
 
   // ───────────────────────────────
   // SIGN IN WITH EMAIL

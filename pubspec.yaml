@@ -23,6 +23,7 @@ dependencies:
   lucide_icons_flutter: ^3.1.5
   intl: ^0.19.0
   fl_chart: ^0.68.0
+  cloudinary_public: ^0.21.0
 
 dev_dependencies:
   flutter_test:

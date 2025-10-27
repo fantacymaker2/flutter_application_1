@@ -21,14 +21,11 @@ class _ReturnsPageState extends State<ReturnsPage> {
   }
 
   Future<void> _calculateStats() async {
-    final now = DateTime.now();
-    final monthStart = DateTime(now.year, now.month, 1);
-    final nextMonth = DateTime(now.year, now.month + 1, 1);
+    
 
     final ordersSnapshot = await FirebaseFirestore.instance
         .collection('orders')
-        .where('createdAt', isGreaterThanOrEqualTo: monthStart)
-        .where('createdAt', isLessThan: nextMonth)
+        .where('status', isEqualTo: 'completed')
         .get();
 
     double total = 0;
