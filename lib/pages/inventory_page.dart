@@ -215,114 +215,119 @@ class _InventoryPageState extends State<InventoryPage> {
                     return name.contains(searchQuery);
                   }).toList();
 
-                  return GridView.builder(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: 1.2,
-                    ),
-                    itemCount: items.length,
-                    itemBuilder: (context, index) {
-                      final item = items[index];
-                      final data = item.data() as Map<String, dynamic>;
-                      final stockColor = _getStockColor(data['stock'], data['lowStockThreshold']);
-                      final stockStatus = _getStockStatus(data['stock'], data['lowStockThreshold']);
+                  return ListView.builder(
+  itemCount: items.length,
+  itemBuilder: (context, index) {
+    final item = items[index];
+    final data = item.data() as Map<String, dynamic>;
+    final stockColor = _getStockColor(data['stock'], data['lowStockThreshold']);
+    final stockStatus = _getStockStatus(data['stock'], data['lowStockThreshold']);
 
-                      return Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1A1A1A),
-                          border: Border.all(color: const Color(0xFF333333)),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    data['name'],
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                Row(
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.edit, color: Color(0xFFD4A027)),
-                                      onPressed: () => _showAddOrEditModal(item: item),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, color: Colors.redAccent),
-                                      onPressed: () => _deleteItem(item.id),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            Text(
-                              data['category'] ?? '',
-                              style: const TextStyle(color: Colors.grey, fontSize: 12),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('PRICE', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                                    Text('₱${data['price']}',
-                                        style: const TextStyle(
-                                            color: Color(0xFFD4A027),
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('STOCK', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                                    Text(
-                                      '${data['stock']} ${data['unit']}',
-                                      style: TextStyle(
-                                          color: stockColor,
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            const Spacer(),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              decoration: BoxDecoration(
-                                color: stockColor,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  stockStatus,
-                                  style: const TextStyle(
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  );
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        border: Border.all(color: const Color(0xFF333333)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header (name + actions)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  data['name'],
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit, color: Color(0xFFD4A027)),
+                    onPressed: () => _showAddOrEditModal(item: item),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.redAccent),
+                    onPressed: () => _deleteItem(item.id),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          Text(
+            data['category'] ?? '',
+            style: const TextStyle(color: Colors.grey, fontSize: 12),
+          ),
+          const SizedBox(height: 12),
+
+          // Price and stock info
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('PRICE', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  Text(
+                    '₱${data['price']}',
+                    style: const TextStyle(
+                      color: Color(0xFFD4A027),
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('STOCK', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  Text(
+                    '${data['stock']} ${data['unit']}',
+                    style: TextStyle(
+                      color: stockColor,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Stock status bar
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              color: stockColor,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Center(
+              child: Text(
+                stockStatus,
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  },
+);
                 },
               ),
             ),

@@ -222,9 +222,7 @@ Future<void> _initData() async {
         _cart.add({...item, 'quantity': 1});
       }
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${item['name']} added to cart')),
-    );
+    
   }
 
   void _toggleCart() {

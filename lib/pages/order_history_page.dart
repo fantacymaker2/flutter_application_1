@@ -30,8 +30,8 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
           decoration: const InputDecoration(
             hintText: "Enter reason for return",
             hintStyle: TextStyle(color: Colors.white54),
-            enabledBorder:
-                UnderlineInputBorder(borderSide: BorderSide(color: Colors.white38)),
+            enabledBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.white38)),
             focusedBorder: UnderlineInputBorder(
                 borderSide: BorderSide(color: Colors.orangeAccent)),
           ),
@@ -177,7 +177,7 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
                   returnStatus == 'pending' ||
                   returnStatus == 'approved';
 
-              // --- 💅 New Improved Card UI ---
+              // --- 💅 Improved Card UI ---
               return Container(
                 margin: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
@@ -198,29 +198,35 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 🟧 Header (Order Number + Date)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "Order #$orderNumber",
-                            style: const TextStyle(
-                              color: Colors.orangeAccent,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          Text(
-                            "$date • $time",
-                            style: const TextStyle(
-                                color: Colors.white54, fontSize: 12),
-                          ),
-                        ],
-                      ),
+                      // 🟧 Header
+                      // 🟧 Header (wrapped)
+Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Text(
+      "Order #$orderNumber",
+      style: const TextStyle(
+        color: Colors.orangeAccent,
+        fontWeight: FontWeight.bold,
+        fontSize: 16,
+      ),
+    ),
+    const SizedBox(height: 4),
+    Text(
+      "$date • $time",
+      style: const TextStyle(
+        color: Colors.white54,
+        fontSize: 12,
+      ),
+    ),
+  ],
+),
                       const SizedBox(height: 10),
 
-                      // 🟧 Status Chips
-                      Row(
+                      // 🟧 Status & Return Labels
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -237,8 +243,7 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
                               ),
                             ),
                           ),
-                          if (returnLabel.isNotEmpty) ...[
-                            const SizedBox(width: 8),
+                          if (returnLabel.isNotEmpty)
                             Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 10, vertical: 4),
@@ -259,7 +264,6 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
                                 ),
                               ),
                             ),
-                          ],
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -307,29 +311,30 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
                       ),
                       const SizedBox(height: 12),
 
-                      // 🟧 Buttons
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
+                      // 🟧 Buttons (now using Wrap)
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.end,
                         children: [
                           OutlinedButton.icon(
                             icon: const Icon(Icons.receipt_long,
                                 color: Colors.orangeAccent),
                             label: const Text("Receipt",
-                                style:
-                                    TextStyle(color: Colors.orangeAccent)),
+                                style: TextStyle(color: Colors.orangeAccent)),
                             style: OutlinedButton.styleFrom(
                               side: const BorderSide(color: Colors.orangeAccent),
                             ),
                             onPressed: () {
-  Navigator.push(
-  context,
-  MaterialPageRoute(
-    builder: (_) => ReceiptPlaceholderPage(orderId: doc.id),
-  ),
-);
-},
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      ReceiptPlaceholderPage(orderId: doc.id),
+                                ),
+                              );
+                            },
                           ),
-                          const SizedBox(width: 10),
                           if (status == 'completed')
                             OutlinedButton.icon(
                               icon: Icon(

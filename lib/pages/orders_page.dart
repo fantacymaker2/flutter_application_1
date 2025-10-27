@@ -234,19 +234,21 @@ class OrdersPage extends StatelessWidget {
               child: Column(
                 children: [
                   // ───── DASHBOARD STATS ─────
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildStatCard("Pending", "$pendingCount", Colors.orange),
-                      _buildStatCard("Completed", "$completedCount", Colors.green),
-                      _buildStatCard("Orders Today", "$totalToday", Colors.blue),
-                      _buildStatCard(
-                        "Revenue",
-                        "₱${revenueToday.toStringAsFixed(2)}",
-                        Colors.amber,
-                      ),
-                    ],
-                  ),
+                  Wrap(
+  spacing: 8, // horizontal spacing between cards
+  runSpacing: 8, // vertical spacing between lines
+  alignment: WrapAlignment.center,
+  children: [
+    _buildStatCard("Pending", "$pendingCount", Colors.orange),
+    _buildStatCard("Completed", "$completedCount", Colors.green),
+    _buildStatCard("Orders Today", "$totalToday", Colors.blue),
+    _buildStatCard(
+      "Revenue",
+      "₱${revenueToday.toStringAsFixed(2)}",
+      Colors.amber,
+    ),
+  ],
+),
                   const SizedBox(height: 20),
 
                   // ───── ORDERS LIST ─────
@@ -281,35 +283,40 @@ class OrdersPage extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               // Header
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    customer,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: getStatusColor(status),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      status.toUpperCase(),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                              Wrap(
+  alignment: WrapAlignment.spaceBetween,
+  crossAxisAlignment: WrapCrossAlignment.center,
+  runSpacing: 4,
+  children: [
+    SizedBox(
+  width: MediaQuery.of(context).size.width * 0.6, // give it a limit
+  child: Text(
+    customer,
+    style: const TextStyle(
+      fontSize: 18,
+      fontWeight: FontWeight.bold,
+      color: Colors.white,
+    ),
+    overflow: TextOverflow.ellipsis,
+    maxLines: 1,
+  ),
+),
+    Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: getStatusColor(status),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        status.toUpperCase(),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    ),
+  ],
+),
                               const SizedBox(height: 8),
 
                               // Items
@@ -324,24 +331,41 @@ class OrdersPage extends StatelessWidget {
                               const SizedBox(height: 8),
 
                               // Footer
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    "₱$total — $payment",
-                                    style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w500),
-                                  ),
-                                  Text(
-                                    DateFormat('MMM d, h:mm a')
-                                        .format(createdAt),
-                                    style: const TextStyle(
-                                        color: Colors.white54, fontSize: 12),
-                                  ),
-                                ],
-                              ),
+                              // Footer (wrapped to avoid overflow)
+Wrap(
+  alignment: WrapAlignment.spaceBetween,
+  runSpacing: 4,
+  children: [
+    Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "₱$total — $payment",
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        if (data['paymentReference'] != null &&
+            (data['paymentReference'] as String).isNotEmpty)
+          Text(
+            "Ref: ${data['paymentReference']}",
+            style: const TextStyle(
+              color: Colors.white54,
+              fontSize: 12,
+            ),
+          ),
+      ],
+    ),
+    Text(
+      DateFormat('MMM d, h:mm a').format(createdAt),
+      style: const TextStyle(
+        color: Colors.white54,
+        fontSize: 12,
+      ),
+    ),
+  ],
+),
                               const SizedBox(height: 10),
 
                               // Buttons
@@ -410,30 +434,36 @@ class OrdersPage extends StatelessWidget {
   }
 
   Widget _buildStatCard(String title, String value, Color color) {
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Text(title,
-                style: const TextStyle(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14)),
-            const SizedBox(height: 4),
-            Text(value,
-                style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16)),
-          ],
-        ),
+  return SizedBox(
+    width: 130, // adjust width as you like (try 150–180)
+    child: Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
       ),
-    );
-  }
+      child: Column(
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontWeight: FontWeight.w500,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 }

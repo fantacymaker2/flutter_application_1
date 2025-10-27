@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "954033012645",
+    "project_id": "grace-burger-47413",
+    "storage_bucket": "grace-burger-47413.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:954033012645:android:1f72df30f2b60e5245724c",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_1"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "954033012645-000o84fena4upc1kkq726e6i99vcggtt.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.flutter_application_1",
+            "certificate_hash": "dc55472d5a1fd6af117ac07ef73a51b195858597"
+          }
+        },
+        {
+          "client_id": "954033012645-f7ruualqanh4b5mte64eedqchi9vqo7n.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.flutter_application_1",
+            "certificate_hash": "942a84b84b2a09a76e487965161719a5c96e7495"
+          }
+        },
+        {
+          "client_id": "954033012645-7ap51glmocob0n6gcr6kubto2ajh75t5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPO1cHnNhsd2wk4FKzucu8jb5RpfUPPr8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "954033012645-7ap51glmocob0n6gcr6kubto2ajh75t5.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

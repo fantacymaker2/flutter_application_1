@@ -69,26 +69,27 @@ if (date == null) continue;
         final items = List<Map<String, dynamic>>.from(data['items'] ?? []);
 
         // === Today's stats ===
-        if (date.isAfter(startOfDay) && date.isBefore(endOfDay)) {
-          totalOrders++;
-          if (status == 'completed' || status == 'ready') {
-            completedCount++;
-            totalRevenue += total;
-          }
+if (!date.isBefore(startOfDay) && !date.isAfter(endOfDay)) {
+  totalOrders++;
+  if (status == 'completed' || status == 'ready') {
+    completedCount++;
+    totalRevenue += total;
+  }
+}
 
-          for (var item in items) {
-            final name = item['name'];
-            final qty = (item['quantity'] ?? 0).toInt();
-            final price = (item['price'] ?? 0).toDouble();
+// === Top products (all time / last 30 days) ===
+for (var item in items) {
+  final name = item['name'];
+  final qty = (item['quantity'] ?? 0).toInt();
+  final price = (item['price'] ?? 0).toDouble();
 
-            if (!productStats.containsKey(name)) {
-              productStats[name] = {'name': name, 'quantity': 0, 'revenue': 0.0};
-            }
+  if (!productStats.containsKey(name)) {
+    productStats[name] = {'name': name, 'quantity': 0, 'revenue': 0.0};
+  }
 
-            productStats[name]!['quantity'] += qty;
-            productStats[name]!['revenue'] += qty * price;
-          }
-        }
+  productStats[name]!['quantity'] += qty;
+  productStats[name]!['revenue'] += qty * price;
+}
 
         // === Monthly stats ===
         if (date.isAfter(monthStart)) {
@@ -141,15 +142,15 @@ if (date == null) continue;
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ====== STATS CARDS ======
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildStatCard(
-                    "Revenue Today", "₱${todayRevenue.toStringAsFixed(2)}", Colors.amber),
-                _buildStatCard("Orders Today", "$ordersToday", Colors.blue),
-                _buildStatCard("Completed", "$completedToday", Colors.green),
-              ],
-            ),
+            Wrap(
+  spacing: 12, // horizontal spacing between cards
+  runSpacing: 12, // vertical spacing when wrapping
+  children: [
+    _buildStatCard("Revenue Today", "₱${todayRevenue.toStringAsFixed(2)}", Colors.amber),
+    _buildStatCard("Orders Today", "$ordersToday", Colors.blue),
+    _buildStatCard("Completed", "$completedToday", Colors.green),
+  ],
+),
             const SizedBox(height: 24),
 
             // ====== MONTHLY REVENUE CHART ======
@@ -223,7 +224,7 @@ if (date == null) continue;
 
             // ====== TOP 5 PRODUCTS LIST ======
             const Text(
-              "🏆 Top 5 Products Today",
+              "🏆 Top 5 Selling products",
               style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,
@@ -278,30 +279,26 @@ if (date == null) continue;
   }
 
   Widget _buildStatCard(String title, String value, Color color) {
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Text(title,
-                style: const TextStyle(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14)),
-            const SizedBox(height: 4),
-            Text(value,
-                style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16)),
-          ],
-        ),
-      ),
-    );
-  }
+  return Container(
+    width: 130, // set a fixed width or let it size naturally
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.2),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Column(
+      children: [
+        Text(title,
+            style: const TextStyle(
+                color: Colors.white70,
+                fontWeight: FontWeight.w500,
+                fontSize: 14)),
+        const SizedBox(height: 4),
+        Text(value,
+            style: TextStyle(
+                color: color, fontWeight: FontWeight.bold, fontSize: 16)),
+      ],
+    ),
+  );
+}
 }
