@@ -132,7 +132,8 @@ for (var item in items) {
     return Scaffold(
       backgroundColor: const Color(0xFF1E1E1E),
       appBar: AppBar(
-        title: const Text("📈 Analytics Dashboard"),
+        title: const Text("📈 Analytics Dashboard",
+        style: TextStyle(color: Colors.white),),
         centerTitle: true,
         backgroundColor: Colors.brown.shade800,
       ),
@@ -178,28 +179,49 @@ for (var item in items) {
                         gridData: FlGridData(show: false),
                         borderData: FlBorderData(show: false),
                         titlesData: FlTitlesData(
-                          leftTitles: AxisTitles(
-                              sideTitles:
-                                  SideTitles(showTitles: true, reservedSize: 40)),
-                          bottomTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              getTitlesWidget: (value, meta) {
-                                final index = value.toInt();
-                                if (index % 5 != 0 ||
-                                    index < 0 ||
-                                    index >= monthlyRevenue.length) {
-                                  return const SizedBox.shrink();
-                                }
-                                return Text(
-                                  monthlyRevenue[index]['day'],
-                                  style: const TextStyle(
-                                      color: Colors.white70, fontSize: 10),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
+  leftTitles: AxisTitles(
+    sideTitles: SideTitles(
+      showTitles: true,
+      reservedSize: 40,
+      getTitlesWidget: (value, meta) {
+        return Text(
+          value.toInt().toString(),
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 11,
+          ),
+        );
+      },
+    ),
+  ),
+  bottomTitles: AxisTitles(
+    sideTitles: SideTitles(
+      showTitles: true,
+      getTitlesWidget: (value, meta) {
+        final index = value.toInt();
+        if (index % 5 != 0 ||
+            index < 0 ||
+            index >= monthlyRevenue.length) {
+          return const SizedBox.shrink();
+        }
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            monthlyRevenue[index]['day'],
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 10,
+            ),
+          ),
+        );
+      },
+      reservedSize: 22,
+    ),
+  ),
+  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+),
                         lineBarsData: [
                           LineChartBarData(
                             isCurved: true,

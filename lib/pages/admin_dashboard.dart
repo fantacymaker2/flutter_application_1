@@ -185,26 +185,30 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildNavItem(String label, IconData icon, int index) {
-    final bool selected = _selectedIndex == index;
-    return ListTile(
-      leading: Icon(icon, color: selected ? Colors.black : Colors.white),
-      title: Text(
-        label,
-        style: TextStyle(
-          color: selected ? Colors.black : Colors.white,
-          fontWeight: FontWeight.w600,
-        ),
+  final bool selected = _selectedIndex == index;
+  return ListTile(
+    leading: Icon(
+      icon,
+      color: selected ? const Color(0xFFD4A027) : Colors.white, // ✅ yellow icon when selected
+    ),
+    title: Text(
+      label,
+      style: TextStyle(
+        color: selected ? const Color(0xFFD4A027) : Colors.white, // ✅ yellow text when selected
+        fontWeight: FontWeight.w600,
       ),
-      tileColor: selected ? const Color(0xFFD4A027) : Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      onTap: () {
-        if (index < _pages.length) {
-          setState(() {
-            _selectedIndex = index;
-            _isSidebarOpen = false; // close after select
-          });
-        }
-      },
-    );
-  }
+    ),
+    tileColor: selected ? Colors.black : Colors.transparent, // ✅ keep background dark instead of yellow fill
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    onTap: () {
+      if (index < _pages.length) {
+        setState(() {
+          _selectedIndex = index;
+          _isSidebarOpen = false;
+        });
+      }
+    },
+  );
+}
+
 }

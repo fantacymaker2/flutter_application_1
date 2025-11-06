@@ -23,6 +23,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _loading = false;
   
   bool _agreeTerms = false;
+  bool _showPassword = false;
   String? _errorMessage;
 
   // ───────────────────────────────
@@ -37,23 +38,32 @@ class _LoginPageState extends State<LoginPage> {
     if (Theme.of(context).platform == TargetPlatform.android ||
         Theme.of(context).platform == TargetPlatform.iOS) {
       // ───────────────────────────────
-      // MOBILE FLOW
-      // ───────────────────────────────
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) {
-        setState(() => _loading = false);
-        return; // User cancelled
-      }
+// MOBILE FLOW (Force account chooser)
+// ───────────────────────────────
+final GoogleSignIn googleSignIn = GoogleSignIn(
+  scopes: ['email'],
+);
 
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+// Force showing the account picker (like prompt: 'select_account')
+await googleSignIn.signOut();
 
-      final credential = GoogleAuthProvider.credential(
-        idToken: googleAuth.idToken,
-        accessToken: googleAuth.accessToken,
-      );
 
-      userCred = await _auth.signInWithCredential(credential);
+final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+if (googleUser == null) {
+  setState(() => _loading = false);
+  return; // User cancelled
+}
+
+final GoogleSignInAuthentication googleAuth =
+    await googleUser.authentication;
+
+final credential = GoogleAuthProvider.credential(
+  idToken: googleAuth.idToken,
+  accessToken: googleAuth.accessToken,
+);
+
+userCred = await _auth.signInWithCredential(credential);
+
     } else {
       // ───────────────────────────────
       // WEB FLOW (like signInWithPopup)
@@ -233,18 +243,31 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 10),
                       TextField(
-                        controller: _passwordController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: "Password",
-                        ),
-                      ),
+  controller: _passwordController,
+  obscureText: !_showPassword,
+  decoration: InputDecoration(
+    labelText: "Password",
+    suffixIcon: IconButton(
+      icon: Icon(
+        _showPassword ? Icons.visibility : Icons.visibility_off,
+      ),
+      onPressed: () {
+        setState(() {
+          _showPassword = !_showPassword;
+        });
+      },
+    ),
+  ),
+),
+
                       const SizedBox(height: 20),
 
                       ElevatedButton(
                         onPressed: _loading ? null : _signInWithEmail,
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.brown),
+                       style: ElevatedButton.styleFrom(
+    backgroundColor: Colors.brown,
+    foregroundColor: Colors.white, // <--- FIXES TEXT CONTRAST
+  ),
                         child: _loading
                             ? const CircularProgressIndicator(
                                 color: Colors.white,
@@ -356,7 +379,10 @@ class _LoginPageState extends State<LoginPage> {
                   passCtrl.text.trim(),
                 );
               },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.brown),
+              style: ElevatedButton.styleFrom(
+    backgroundColor: Colors.brown,
+    foregroundColor: Colors.white, // <--- MATCHING FIX HERE
+  ),
               child: const Text("Create Account"),
             ),
           ],

@@ -4,6 +4,7 @@ import '../services/firebase_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'checkout_page.dart';
 import 'order_history_page.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class MenuPage extends StatefulWidget {
   const MenuPage({super.key});
@@ -11,7 +12,9 @@ class MenuPage extends StatefulWidget {
   @override
   State<MenuPage> createState() => _MenuPageState();
 }
-
+const kBackground = Color(0xFF000000); // main background
+const kPanel = Color(0xFF111111); // card/panel background
+const kAccent = Color(0xFFD4A027); // gold accent
 class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   final FirebaseService _firebaseService = FirebaseService();
   final List<Map<String, dynamic>> _cart = [];
@@ -23,6 +26,11 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
   List<Map<String, dynamic>> _inventory = []; // ✅ store inventory data
   List<Map<String, dynamic>> _topItems = [];
   bool _isLoadingTopItems = true;
+  bool _showTopItems = true;
+  bool _showTop5 = true; // controls collapse / expand
+  
+late AnimationController _top5Controller;
+late Animation<double> _top5Animation;
 
 
   late AnimationController _cartController;
@@ -38,12 +46,23 @@ class _MenuPageState extends State<MenuPage> with TickerProviderStateMixin {
     "Beverages"
   ];
 
-  @override
+  
   @override
 void initState() {
   super.initState();
   _tabController = TabController(length: categories.length, vsync: this);
   _cartController = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
+
+   // ADD THIS FOR TOP 5 SLIDE
+  _top5Controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 300),
+  );
+  _top5Animation = CurvedAnimation(
+    parent: _top5Controller,
+    curve: Curves.easeInOut,
+  );
+  _top5Controller.forward(); // start expanded
 
    _initData();
 
@@ -64,6 +83,7 @@ Future<void> _initData() async {
   void dispose() {
     _tabController?.dispose();
     _cartController.dispose();
+    _top5Controller.dispose();
     super.dispose();
   }
 
@@ -222,7 +242,13 @@ Future<void> _initData() async {
         _cart.add({...item, 'quantity': 1});
       }
     });
-    
+    // ✅ Snackbar notification (this is what you removed before)
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text("${item['name']} added to cart"),
+      duration: const Duration(seconds: 1),
+    ),
+  );
   }
 
   void _toggleCart() {
@@ -248,19 +274,54 @@ Future<void> _initData() async {
     return filtered;
   }
 
+  void _showLogoutDialog() {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text("Log Out"),
+      content: const Text("Are you sure you want to log out?"),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Cancel"),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          onPressed: () async {
+            Navigator.pop(context); // close popup
+            await FirebaseAuth.instance.signOut();
+            await GoogleSignIn().signOut(); // also clear Google session
+            if (context.mounted) {
+              Navigator.pushReplacementNamed(context, '/login');
+            }
+          },
+          child: const Text("Log Out"),
+        ),
+      ],
+    ),
+  );
+}
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: kBackground,
       appBar: AppBar(
-        title: const Text('Menu'),
+        backgroundColor: kPanel,
+        title: const Text('Menu',style: TextStyle(color: Colors.white),),
         bottom: TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          tabs: categories.map((cat) => Tab(text: cat)).toList(),
-        ),
+  controller: _tabController,
+  isScrollable: true,
+  indicatorColor: kAccent,
+  labelColor: kAccent,
+  unselectedLabelColor: Colors.white70,
+  tabs: categories.map((cat) => Tab(text: cat)).toList(),
+),
         actions: [
   IconButton(
-    icon: const Icon(Icons.history),
+    icon: const Icon(Icons.history, color: Colors.white),
     tooltip: 'Order History',
     onPressed: () {
       final user = FirebaseAuth.instance.currentUser;
@@ -276,7 +337,7 @@ Navigator.push(
     alignment: Alignment.center,
     children: [
       IconButton(
-        icon: const Icon(Icons.shopping_cart),
+        icon: const Icon(Icons.shopping_cart, color: Colors.white),
         onPressed: _toggleCart,
       ),
       if (_cart.isNotEmpty)
@@ -295,15 +356,10 @@ Navigator.push(
     ],
   ),
   IconButton(
-    icon: const Icon(Icons.logout),
-    tooltip: 'Logout',
-    onPressed: () async {
-      await FirebaseAuth.instance.signOut();
-      if (context.mounted) {
-        Navigator.pushReplacementNamed(context, '/login');
-      }
-    },
-  ),
+  icon: const Icon(Icons.logout, color: Colors.white),
+  tooltip: 'Logout',
+  onPressed: _showLogoutDialog,
+),
 ],
 
       ),
@@ -318,129 +374,158 @@ Navigator.push(
           child: TextField(
             controller: _searchController,
             decoration: InputDecoration(
-              hintText: "Search in this category",
-              prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
+  hintText: "Search in this category",
+  hintStyle: const TextStyle(color: Colors.white54),
+  prefixIcon: const Icon(Icons.search, color: Colors.white70),
+  filled: true,
+  fillColor: kPanel,
+  border: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(10),
+    borderSide: BorderSide.none,
+  ),
+),
+style: const TextStyle(color: Colors.white),
           ),
         ),
 
-        // 🔥 Top 5 section scrollable horizontally
-        if (_isLoadingTopItems)
-          const Center(child: CircularProgressIndicator())
-        else if (_topItems.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text("🔥 No top orders yet"),
-          )
-        else
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "🔥 Top 5 Most Ordered",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.orangeAccent,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 200,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _topItems.length,
-                    itemBuilder: (context, index) {
-                      final item = _topItems[index];
-                      return Container(
-                        width: 160,
-                        margin: const EdgeInsets.only(right: 10),
-                        child: Card(
-                          color: Colors.black12,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Expanded(
-                                child: ClipRRect(
-                                  borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(15),
-                                  ),
-                                  child: Image.network(
-                                    item['image'] ?? '',
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Icon(
-                                      Icons.fastfood,
-                                      size: 50,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(item['name'],
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white)),
-                                    Text('₱${item['price']}',
-                                        style: const TextStyle(
-                                            color: Colors.white70)),
-                                    Text('Ordered ${item['count']}x',
-                                        style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.orangeAccent)),
-                                    const SizedBox(height: 6),
-                                    ElevatedButton(
-                                      onPressed: () {
-                                        final matched = _menuItems.firstWhere(
-                                          (m) =>
-                                              m['name'].toString().toLowerCase() ==
-                                              item['name']
-                                                  .toString()
-                                                  .toLowerCase(),
-                                          orElse: () => {},
-                                        );
-                                        final fullItem = matched.isNotEmpty
-                                            ? matched
-                                            : {
-                                                'id': item['name'],
-                                                'name': item['name'],
-                                                'price': item['price'],
-                                                'image': item['image'],
-                                                'description': '',
-                                                'ingredients': const [],
-                                              };
-                                        _addToCart(fullItem);
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.orangeAccent,
-                                      ),
-                                      child: const Text('Add to Cart'),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const Divider(thickness: 1),
-              ],
+        // 🔥 Top 5 collapsible section
+if (_isLoadingTopItems)
+  const Center(child: CircularProgressIndicator())
+else if (_topItems.isEmpty)
+  const SizedBox.shrink()
+else
+ Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      GestureDetector(
+        onTap: () {
+          setState(() {
+            _showTopItems = !_showTopItems;
+            
+          });
+          if (_showTopItems) {
+    _top5Controller.forward();
+  } else {
+    _top5Controller.reverse();
+  }
+        },
+        child: Row(
+          children: [
+            const Text(
+              "🔥 Top 5 Most Ordered",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: kAccent,
+              ),
             ),
-          ),
+            const Spacer(),
+            AnimatedRotation(
+              turns: _showTopItems ? 0 : 0.5, // flips arrow
+              duration: const Duration(milliseconds: 300),
+              child: const Icon(Icons.keyboard_arrow_down, color: kAccent),
+            ),
+          ],
+        ),
+      ),
+
+      SizeTransition(
+        sizeFactor: _top5Animation,
+        axisAlignment: 1.0,
+        child: Column(
+          children: [
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 200,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: _topItems.length,
+                itemBuilder: (context, index) {
+                  final item = _topItems[index];
+                  return Container(
+                    width: 160,
+                    margin: const EdgeInsets.only(right: 10),
+                    child: Card(
+                      color: kPanel,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(15),
+                              ),
+                              child: Image.network(
+                                item['image'] ?? '',
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(item['name'],
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white)),
+                                Text('₱${item['price']}',
+                                    style: const TextStyle(color: Colors.white70)),
+                                Text('Ordered ${item['count']}x',
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.orangeAccent)),
+                                const SizedBox(height: 6),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    final matched = _menuItems.firstWhere(
+                                      (m) =>
+                                          m['name'].toString().toLowerCase() ==
+                                          item['name'].toString().toLowerCase(),
+                                      orElse: () => {},
+                                    );
+                                    final fullItem = matched.isNotEmpty
+                                        ? matched
+                                        : {
+                                            'id': item['name'],
+                                            'name': item['name'],
+                                            'price': item['price'],
+                                            'image': item['image'],
+                                            'description': '',
+                                            'ingredients': const [],
+                                          };
+                                    _addToCart(fullItem);
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.orangeAccent,
+                                  ),
+                                  child: const Text('Add to Cart'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const Divider(thickness: 1),
+          ],
+        ),
+      ),
+    ],
+  ),
+),
+
+
 
         // 🧱 Expand the tabbed menu grid below
         Expanded(
@@ -466,6 +551,7 @@ Navigator.push(
                   return Stack(
                     children: [
                       Card(
+                        color: kPanel,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(15),
                         ),
@@ -498,13 +584,14 @@ Navigator.push(
                                 children: [
                                   Text(item['name'],
                                       style: const TextStyle(
+                                        color: Colors.white,
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold)),
-                                  Text('₱${item['price']}'),
+                                  Text('₱${item['price']}', style: const TextStyle(color: Colors.white70)),
                                   const SizedBox(height: 4),
                                   Text(item['description'],
                                       style:
-                                          const TextStyle(fontSize: 12),
+                                          const TextStyle(fontSize: 12, color: Colors.white54),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis),
                                   const SizedBox(height: 8),
@@ -513,13 +600,12 @@ Navigator.push(
                                         ? null
                                         : () => _addToCart(item),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: isSoldOut
-                                          ? Colors.grey
-                                          : Colors.orangeAccent,
-                                    ),
-                                    child: Text(isSoldOut
-                                        ? 'Sold Out'
-                                        : 'Add to Cart'),
+  backgroundColor: isSoldOut ? Colors.grey : kAccent,
+),
+child: Text(
+  isSoldOut ? 'Sold Out' : 'Add to Cart',
+  style: TextStyle(color: isSoldOut ? Colors.white : Colors.black),
+),
                                   ),
                                 ],
                               ),
@@ -537,132 +623,153 @@ Navigator.push(
       ],
     ),
           // ✅ unchanged cart drawer below
-          AnimatedBuilder(
-            animation: _cartController,
-            builder: (context, child) {
-              return FractionalTranslation(
-                translation: Offset(1 - _cartController.value, 0),
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Container(
-                    width: 300,
-                    color: Colors.white,
-                    child: Column(
-                      children: [
-                        AppBar(
-                          title: const Text("Your Cart"),
-                          automaticallyImplyLeading: false,
-                          actions: [
-                            IconButton(
-                              icon: const Icon(Icons.close),
-                              onPressed: _toggleCart,
+          // ✅ themed cart drawer (matches app theme)
+AnimatedBuilder(
+  animation: _cartController,
+  builder: (context, child) {
+    return FractionalTranslation(
+      translation: Offset(1 - _cartController.value, 0),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          width: 300,
+          color: kPanel, // <- match your dark panel background
+          child: Column(
+            children: [
+              AppBar(
+                backgroundColor: kAccent, // <- your accent color (e.g., gold)
+                title: const Text(
+                  "Your Cart",
+                  style: TextStyle(color: Colors.black),
+                ),
+                automaticallyImplyLeading: false,
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.black),
+                    onPressed: _toggleCart,
+                  ),
+                ],
+              ),
+              Expanded(
+                child: _cart.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Cart is empty',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: _cart.length,
+                        itemBuilder: (context, index) {
+                          final item = _cart[index];
+                          return ListTile(
+                            title: Text(
+                              item['name'],
+                              style: const TextStyle(color: Colors.white),
                             ),
-                            
-                          ],
-                          
-                        ),
-                        Expanded(
-                          child: _cart.isEmpty
-                              ? const Center(child: Text('Cart is empty'))
-                              : ListView.builder(
-                                  itemCount: _cart.length,
-                                  itemBuilder: (context, index) {
-                                    final item = _cart[index];
-                                    return ListTile(
-                                      title: Text(item['name']),
-                                      subtitle: Text(
-                                          '₱${item['price']} x ${item['quantity']}'),
-                                      trailing: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          IconButton(
-                                            icon: const Icon(Icons.remove),
-                                            onPressed: () {
-                                              setState(() {
-                                                if (item['quantity'] > 1) {
-                                                  item['quantity'] -= 1;
-                                                } else {
-                                                  _cart.removeAt(index);
-                                                }
-                                              });
-                                            },
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(Icons.add),
-                                            onPressed: () {
-                                              setState(() {
-                                                item['quantity'] += 1;
-                                              });
-                                            },
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(Icons.close),
-                                            onPressed: () {
-                                              setState(() {
-                                                _cart.removeAt(index);
-                                              });
-                                            },
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Column(
-                            children: [
-                              Text(
-                                'Total: ₱${_cart.fold(0, (sum, item) => sum + ((item['price'] as num) * (item['quantity'] ?? 1)).toInt())}',
-                                style: const TextStyle(
-                                    fontSize: 18, fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 8),
-                              ElevatedButton(
-                                onPressed: () {
-                                  if (_cart.isNotEmpty) {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => CheckoutPage(
-                                          cart: _cart,
-                                          totalPrice: _cart.fold(0, (sum, item) {
-                                            final price =
-                                                (item['price'] as num).toDouble();
-                                            final quantity =
-                                                (item['quantity'] ?? 1) as int;
-                                            return sum + (price * quantity).toInt();
-                                          }),
-                                          onBack: () => Navigator.pop(context),
-                                          onPlaceOrder: (orderId, extra) async {
-                                            print('Order placed: $orderId');
-                                          },
-                                        ),
-                                      ),
-                                    ).then((shouldClear) {
-                                      if (shouldClear == true) {
-                                        setState(() => _cart.clear());
+                            subtitle: Text(
+                              '₱${item['price']} x ${item['quantity']}',
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.remove,
+                                      color: Colors.white),
+                                  onPressed: () {
+                                    setState(() {
+                                      if (item['quantity'] > 1) {
+                                        item['quantity'] -= 1;
+                                      } else {
+                                        _cart.removeAt(index);
                                       }
                                     });
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  minimumSize: const Size(double.infinity, 50),
-                                  backgroundColor: Colors.green,
+                                  },
                                 ),
-                                child: const Text('Checkout'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                                IconButton(
+                                  icon: const Icon(Icons.add,
+                                      color: Colors.white),
+                                  onPressed: () {
+                                    setState(() {
+                                      item['quantity'] += 1;
+                                    });
+                                  },
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close,
+                                      color: Colors.redAccent),
+                                  onPressed: () {
+                                    setState(() {
+                                      _cart.removeAt(index);
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  children: [
+                    Text(
+                      'Total: ₱${_cart.fold(0, (sum, item) => sum + ((item['price'] as num) * (item['quantity'] ?? 1)).toInt())}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (_cart.isNotEmpty) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => CheckoutPage(
+                                cart: _cart,
+                                totalPrice: _cart.fold(0, (sum, item) {
+                                  final price =
+                                      (item['price'] as num).toDouble();
+                                  final quantity =
+                                      (item['quantity'] ?? 1) as int;
+                                  return sum + (price * quantity).toInt();
+                                }),
+                                onBack: () => Navigator.pop(context),
+                                onPlaceOrder: (orderId, extra) async {
+                                  print('Order placed: $orderId');
+                                },
+                              ),
+                            ),
+                          ).then((shouldClear) {
+                            if (shouldClear == true) {
+                              setState(() => _cart.clear());
+                            }
+                          });
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 50),
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Checkout'),
+                    ),
+                  ],
                 ),
-              );
-            },
+              ),
+            ],
           ),
+        ),
+      ),
+    );
+  },
+),
+
         ],
       ),
     );

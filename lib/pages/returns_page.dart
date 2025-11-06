@@ -59,10 +59,54 @@ class _ReturnsPageState extends State<ReturnsPage> {
   }
 
   Future<void> _rejectReturn(String orderId) async {
-    await FirebaseFirestore.instance.collection('orders').doc(orderId).update({
-      'returnRequested': false,
-    });
-  }
+  TextEditingController reasonController = TextEditingController();
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text("Reject Return", style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: reasonController,
+          maxLines: 3,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: "Enter rejection reason...",
+            hintStyle: TextStyle(color: Colors.white54),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.white54),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            child: const Text("Cancel", style: TextStyle(color: Colors.white70)),
+            onPressed: () => Navigator.pop(context),
+          ),
+          TextButton(
+            child: const Text("Reject", style: TextStyle(color: Colors.redAccent)),
+            onPressed: () async {
+              final reason = reasonController.text.trim().isEmpty
+                  ? "No reason provided"
+                  : reasonController.text.trim();
+
+              await FirebaseFirestore.instance.collection('orders').doc(orderId).update({
+                'returnRequested': false,
+                'returnRejected': true,
+                'returnRejectionReason': reason,
+                'returnRejectedAt': FieldValue.serverTimestamp(),
+              });
+
+              Navigator.pop(context);
+              _calculateStats();
+            },
+          ),
+        ],
+      );
+    },
+  );
+}
 
   @override
   Widget build(BuildContext context) {

@@ -49,7 +49,7 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
         ],
       ),
     );
-
+    
     if (reason == null || reason.isEmpty) return;
 
     try {
@@ -70,6 +70,57 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
     }
   }
 
+  void _showRejectionReason(BuildContext context, String reason) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: const Color(0xFF1A1A1A),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (context) {
+      return Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Return Rejected",
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              "Reason:",
+              style: TextStyle(
+                color: Colors.white70,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              reason,
+              style: const TextStyle(color: Colors.white),
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Close", style: TextStyle(color: Colors.redAccent)),
+              ),
+            )
+          ],
+        ),
+      );
+    },
+  );
+}
+
+
   Color _getStatusColor(String status) {
     switch (status) {
       case 'completed':
@@ -85,6 +136,7 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
   }
 
   String _getReturnLabel(Map<String, dynamic> data) {
+    if (data['returnRejected'] == true) return "RETURN DENIED";
     if (data['returned'] == true) return "RETURNED";
     if (data['returnStatus'] == 'approved') return "RETURNED";
     if (data['returnStatus'] == 'pending' || data['returnRequested'] == true) {
@@ -176,6 +228,7 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
                   returned ||
                   returnStatus == 'pending' ||
                   returnStatus == 'approved';
+                  data['returnRejected'] == true;
 
               // --- 💅 Improved Card UI ---
               return Container(
@@ -267,6 +320,53 @@ Column(
                         ],
                       ),
                       const SizedBox(height: 12),
+// 🟧 Show Rejection Reason (if applicable)
+if (data['returnRejected'] == true)
+  GestureDetector(
+    onTap: () {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: Colors.black87,
+          title: const Text(
+            "Return Denied Reason",
+            style: TextStyle(color: Colors.redAccent),
+          ),
+          content: Text(
+            data['returnRejectionReason'] ?? "No reason provided",
+            style: const TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Close", style: TextStyle(color: Colors.redAccent)),
+            ),
+          ],
+        ),
+      );
+    },
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.redAccent.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.redAccent),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          
+          SizedBox(width: 4),
+          Text(
+            "View Reason",
+            style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    ),
+  ),
+  const SizedBox(height: 12),
+
 
                       // 🟧 Item Thumbnails
                       SizedBox(
@@ -344,12 +444,13 @@ Column(
                                     : Colors.redAccent,
                               ),
                               label: Text(
-                                returnStatus == 'approved'
-                                    ? "Returned"
-                                    : returnStatus == 'pending' ||
-                                            returnRequested
-                                        ? "Pending"
-                                        : "Return",
+                                data['returnRejected'] == true
+    ? "Denied"
+    : returnStatus == 'approved' || returned
+        ? "Returned"
+        : returnStatus == 'pending' || returnRequested
+            ? "Pending"
+            : "Return",
                                 style: TextStyle(
                                   color: isReturnDisabled
                                       ? Colors.grey

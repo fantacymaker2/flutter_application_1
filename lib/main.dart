@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'pages/login_page.dart';
 import 'pages/menu_page.dart';
-import 'pages/admin_home_page.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,7 +45,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/login': (context) => const LoginPage(),
         '/menu': (context) => const MenuPage(),
-        '/adminhome': (context) => const AdminHomePage(),
+
       },
     );
   }

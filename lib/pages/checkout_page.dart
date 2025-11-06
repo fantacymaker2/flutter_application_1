@@ -48,8 +48,19 @@ class _CheckoutPageState extends State<CheckoutPage> {
     }
 
     setState(() => isLoading = true);
-
+   
     try {
+
+      if (selectedPayment == 'gcash') {
+  final ref = referenceController.text.trim();
+  if (ref.length != 13) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please enter a valid 13-digit reference number.')),
+    );
+    setState(() => isLoading = false);
+    return;
+  }
+}
       final now = DateTime.now();
       final orderNumber = 'ORD-${now.millisecondsSinceEpoch}';
       final paymentMethod = selectedPayment;
@@ -90,7 +101,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
         'estimatedTime': '20-30 mins',
         'contactNumber': '+63 912 345 6789',
       };
-
+      
+      
       // ✅ Save to Firestore
       final docRef = await FirebaseFirestore.instance.collection('orders').add(orderData);
 final savedOrder = await docRef.get();
@@ -124,8 +136,10 @@ if (mounted) {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+      
       appBar: AppBar(
         backgroundColor: Colors.black,
+        automaticallyImplyLeading: false,
         title: Row(
           children: [
             IconButton(
@@ -431,19 +445,26 @@ if (mounted) {
           ),
           const SizedBox(height: 16),
           TextField(
-            controller: referenceController,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              labelText: 'Enter reference number',
-              labelStyle: const TextStyle(color: Colors.amber),
-              enabledBorder: OutlineInputBorder(
-                  borderSide: const BorderSide(color: Colors.grey),
-                  borderRadius: BorderRadius.circular(8)),
-              focusedBorder: OutlineInputBorder(
-                  borderSide: const BorderSide(color: Colors.amber),
-                  borderRadius: BorderRadius.circular(8)),
-            ),
-          )
+  controller: referenceController,
+  keyboardType: TextInputType.number,
+  inputFormatters: [
+    FilteringTextInputFormatter.digitsOnly, // ✅ only allow numbers
+    LengthLimitingTextInputFormatter(13), // ✅ limit to 9 digits
+  ],
+  style: const TextStyle(color: Colors.white),
+  decoration: InputDecoration(
+    labelText: 'Enter 13-digit reference number',
+    labelStyle: const TextStyle(color: Colors.amber),
+    enabledBorder: OutlineInputBorder(
+      borderSide: const BorderSide(color: Colors.grey),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderSide: const BorderSide(color: Colors.amber),
+      borderRadius: BorderRadius.circular(8),
+    ),
+  ),
+),
         ],
       ),
     );

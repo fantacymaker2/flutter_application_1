@@ -180,7 +180,8 @@ class OrdersPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFF1E1E1E),
       appBar: AppBar(
-        title: const Text("Orders Dashboard"),
+        title: const Text("Orders Dashboard",
+        style: TextStyle(color: Colors.white),),
         backgroundColor: Colors.brown.shade800,
         centerTitle: true,
       ),
