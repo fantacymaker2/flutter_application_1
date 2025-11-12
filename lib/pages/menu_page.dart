@@ -185,6 +185,8 @@ Future<void> _initData() async {
 
   for (var orderDoc in ordersSnapshot.docs) {
     final data = orderDoc.data();
+    final status = data['status']?.toString().toLowerCase() ?? '';
+    if (status == 'cancelled') continue;
     final items = List<Map<String, dynamic>>.from(data['items'] ?? []);
     for (var item in items) {
       final name = item['name']?.toString()?.trim() ?? '';
@@ -443,78 +445,113 @@ else
                 scrollDirection: Axis.horizontal,
                 itemCount: _topItems.length,
                 itemBuilder: (context, index) {
-                  final item = _topItems[index];
-                  return Container(
-                    width: 160,
-                    margin: const EdgeInsets.only(right: 10),
-                    child: Card(
-                      color: kPanel,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(15),
-                              ),
-                              child: Image.network(
-                                item['image'] ?? '',
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(item['name'],
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white)),
-                                Text('₱${item['price']}',
-                                    style: const TextStyle(color: Colors.white70)),
-                                Text('Ordered ${item['count']}x',
-                                    style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.orangeAccent)),
-                                const SizedBox(height: 6),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    final matched = _menuItems.firstWhere(
-                                      (m) =>
-                                          m['name'].toString().toLowerCase() ==
-                                          item['name'].toString().toLowerCase(),
-                                      orElse: () => {},
-                                    );
-                                    final fullItem = matched.isNotEmpty
-                                        ? matched
-                                        : {
-                                            'id': item['name'],
-                                            'name': item['name'],
-                                            'price': item['price'],
-                                            'image': item['image'],
-                                            'description': '',
-                                            'ingredients': const [],
-                                          };
-                                    _addToCart(fullItem);
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.orangeAccent,
-                                  ),
-                                  child: const Text('Add to Cart'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+  final item = _topItems[index];
+
+  // 🧠 Try to find the full menu item (to access ingredients)
+  final matched = _menuItems.firstWhere(
+    (m) =>
+        m['name'].toString().toLowerCase().trim() ==
+        item['name'].toString().toLowerCase().trim(),
+    orElse: () => {},
+  );
+
+  final fullItem = matched.isNotEmpty
+      ? matched
+      : {
+          'id': item['name'],
+          'name': item['name'],
+          'price': item['price'],
+          'image': item['image'],
+          'description': '',
+          'ingredients': const [],
+        };
+
+  // ✅ Reuse your sold-out logic
+  final isSoldOut = _isItemSoldOut(fullItem);
+
+  return Container(
+    width: 160,
+    margin: const EdgeInsets.only(right: 10),
+    child: Card(
+      color: kPanel,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(15),
+                  ),
+                  child: ColorFiltered(
+                    colorFilter: isSoldOut
+                        ? const ColorFilter.mode(
+                            Colors.black45, BlendMode.darken)
+                        : const ColorFilter.mode(
+                            Colors.transparent, BlendMode.multiply),
+                    child: Image.network(
+                      item['image'] ?? '',
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                    ),
+                  ),
+                ),
+                if (isSoldOut)
+                  const Center(
+                    child: Text(
+                      "SOLD OUT",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                        backgroundColor: Colors.black54,
                       ),
                     ),
-                  );
-                },
+                  ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(fullItem['name'],
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, color: Colors.white)),
+                Text('₱${fullItem['price']}',
+                    style: const TextStyle(color: Colors.white70)),
+                Text('Ordered ${item['count']}x',
+                    style: const TextStyle(
+                        fontSize: 12, color: Colors.orangeAccent)),
+                const SizedBox(height: 6),
+                ElevatedButton(
+                  onPressed:
+                      isSoldOut ? null : () => _addToCart(fullItem),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        isSoldOut ? Colors.grey : Colors.orangeAccent,
+                  ),
+                  child: Text(
+                    isSoldOut ? 'Sold Out' : 'Add to Cart',
+                    style: TextStyle(
+                        color: isSoldOut ? Colors.white : Colors.black),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+},
+
               ),
             ),
             const Divider(thickness: 1),

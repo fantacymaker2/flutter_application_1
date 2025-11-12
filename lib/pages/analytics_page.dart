@@ -78,10 +78,17 @@ if (!date.isBefore(startOfDay) && !date.isAfter(endOfDay)) {
 }
 
 // === Top products (all time / last 30 days) ===
+final statusLower = data['status']?.toString()?.toLowerCase() ?? '';
+if (statusLower == 'cancelled') continue;
+
+
+
 for (var item in items) {
   final name = item['name'];
   final qty = (item['quantity'] ?? 0).toInt();
   final price = (item['price'] ?? 0).toDouble();
+
+  if (name == null || name.toString().trim().isEmpty) continue;
 
   if (!productStats.containsKey(name)) {
     productStats[name] = {'name': name, 'quantity': 0, 'revenue': 0.0};

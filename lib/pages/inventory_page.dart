@@ -116,28 +116,33 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   Future<void> _saveItem() async {
-    if (!_formKey.currentState!.validate()) return;
+  if (!_formKey.currentState!.validate()) return;
 
-    final itemData = {
-      'name': _nameController.text.trim(),
-      'category': _categoryController.text.trim(),
-      'stock': int.tryParse(_stockController.text) ?? 0,
-      'unit': _unitController.text.trim(),
-      'price': double.tryParse(_priceController.text) ?? 0,
-      'lowStockThreshold': int.tryParse(_lowStockController.text) ?? 0,
-      'updatedAt': FieldValue.serverTimestamp(),
+  final itemData = {
+    'name': _nameController.text.trim(),
+    'category': _categoryController.text.trim(),
+    'stock': int.tryParse(_stockController.text) ?? 0,
+    'unit': _unitController.text.trim(),
+    'price': double.tryParse(_priceController.text) ?? 0,
+    'lowStockThreshold': int.tryParse(_lowStockController.text) ?? 0,
+    'updatedAt': FieldValue.serverTimestamp(),
+  };
+
+  final ref = FirebaseFirestore.instance.collection('inventory');
+
+  if (editingItemId == null) {
+    // ✅ New item → set both createdAt & updatedAt
+    await ref.add({
+      ...itemData,
       'createdAt': FieldValue.serverTimestamp(),
-    };
-
-    final ref = FirebaseFirestore.instance.collection('inventory');
-    if (editingItemId == null) {
-      await ref.add(itemData);
-    } else {
-      await ref.doc(editingItemId).update(itemData);
-    }
-
-    Navigator.pop(context);
+    });
+  } else {
+    // ✅ Existing item → only update data & updatedAt
+    await ref.doc(editingItemId).update(itemData);
   }
+
+  Navigator.pop(context);
+}
 
   Future<void> _deleteItem(String id) async {
     await FirebaseFirestore.instance.collection('inventory').doc(id).delete();
